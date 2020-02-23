@@ -1,0 +1,50 @@
+//Macarie Razvan Cristian, 322CB
+
+1.Analiza binarului nice
+	Functia vulerabila este 0x0804864c. Aceasta este vulnerabila deoarece pune 
+in eax al doilea parametru transmis functieie si apoi are instructiunea call 
+eax. Problema este ca read-ul nu este egal cu lungimea bufferului, astfel 
+putem sa ii facem overflow bufferului si sa punem la in al doilea parametru, pe
+care l-ar avea functia, adresa functiei print_flag (0x080485b1).
+
+2. Spargerea binarului - NICE_FLAG{cc49d608768be86252a329120af73d55}
+	Binarul apeleaza functii care contin read si citest un numar de octeti. 
+Astfel trebuie sa saturam read-ul ca sa punem payloadul intr-un singur fisier.
+Dupa un offset de 1133 de caractere (218 de la prima functie + 350 de la a 
+doua + 151 de la a treia functie + 402 de la buffer + 4 oldEBP + 4 adresa de 
+ret + 4 de la parametrul1) punem adresa functiei print_flag. Pentru a pune 
+adresa lui print_flag am folosit functia print din python.
+
+3. Spargerea binarului v2 - NAUGHTY_FLAG{6de0be029acd2310e4238a72b5a47275}
+	Pentru binarul naughty avem aceiasi functie vulnerabila insa fiecare 
+functie pana la cea vulnerabila mai are overificare in plus. Se verifica la 
+fiecare functie daca un parametru local, locat fix dupa buffer, este egal cu o 
+valoare in hexa. Astfel pentru fiecare functie am folosit urmatorul format
+('A' de lungimea_buferului - 1 ori) + \n
+(verificarea in hexa) + \n
+('A' de lungimea readului - lungimea_bufferului - 5 - 1 ori) + \n
+	Am repetat aces lucru pana la ultima functie numai ca am pus in loc de
+ultima grupa de 'A' offsetul si adresa lui print_flag.
+
+4.Shellcode
+	Obs: am atasat poze cum exploitul functioneaza si deschide un shell in gdb.
+Pentru ca sunt alte adrese cel mai probabil nu o sa functioneze pe alta masina,
+am incercat inclusiv cu aceiasi imagine de masina virtuala de IOCLA si nu a functionat.
+	Initial m-am documentat despre shellcodes si am descoperit ca trebuie sa 
+pun in cadrul ultimei functii in eax o adresa de pe stiva, iar pe stiva sa pun
+valori in hexa care reprezinta instructiuni, cand EIP trece peste ele le 
+ruleaza ca si cum ar fi o functie. Pentru asta am urmat urmatorii pasi:
+
+- am scris un program in assembly care creeaza un shell
+- l-am compilat cu : nasm -f elf coduShellcode.asm
+- i-am dat objdump
+- am luat octet cu octet instructiunile din objdump scrise in hexa si le-am salvat
+- am rulat cu gdb-peda binarul cu acelasi payload de la 3 insa am pus cateva sute de A la final
+- am cautat pe stiva cu: x/1000 $sp o adresa unde am A-uri
+- am modificat payloadul ca sa am in eax adresa aia de pe stiva si mi-am pregatit noul payload
+- in payload dupa adresa de pe stiva am pus 0x90 care sunt nop-uri, adica EIP pur si simplu
+  trece peste ele (am facut asta pentru ca nu stiam exact adresa de unde incepe shellcodeul)
+  si apoi shellcodeul octet cu octet (acela luat din objdump)
+- se ruleaza shellcodeul si imi deschide bin/dash
+  Initial am crezut ca e incorect insa /dash este o varianta lightweight a 
+bash-ului
